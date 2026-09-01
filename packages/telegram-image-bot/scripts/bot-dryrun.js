@@ -8,6 +8,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 process.env.BOT_TOKEN ||= "000000:dryrun-token";
+process.env.PROXY_URL = "none"; // the stubbed transport must not be routed anywhere
 process.env.COLLECT_DEBOUNCE_MS ||= "150";
 process.env.PROGRESS_INTERVAL_MS ||= "0";
 

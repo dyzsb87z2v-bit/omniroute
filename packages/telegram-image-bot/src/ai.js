@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import { config } from "./config.js";
+import { httpFetch } from "./http.js";
 import { log } from "./logger.js";
 
 /**
@@ -80,7 +81,7 @@ export async function detectSubjectWithAi(buffer, size) {
     ],
   };
 
-  const res = await fetch(`${config.ai.baseUrl}/chat/completions`, {
+  const res = await httpFetch(`${config.ai.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "content-type": "application/json",

@@ -3,12 +3,13 @@ import path from "node:path";
 import { config } from "./config.js";
 import { processImage, outputExtension } from "./process.js";
 import { ensureDir } from "./session.js";
+import { httpFetch } from "./http.js";
 import { log } from "./logger.js";
 
 /** Download a Telegram file into memory. */
 async function download(telegram, fileId) {
   const link = await telegram.getFileLink(fileId);
-  const res = await fetch(link.href ?? link, { signal: AbortSignal.timeout(60_000) });
+  const res = await httpFetch(link.href ?? link, { signal: AbortSignal.timeout(60_000) });
   if (!res.ok) throw new Error(`download failed with HTTP ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
 }

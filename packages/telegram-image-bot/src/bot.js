@@ -4,6 +4,7 @@ import { config } from "./config.js";
 import { getSession, clearSession, startSessionReaper, ensureDir } from "./session.js";
 import { runBatch } from "./pipeline.js";
 import { createZipParts } from "./zip.js";
+import { telegramAgent } from "./http.js";
 import { log } from "./logger.js";
 
 const IMAGE_MIME = /^image\/(jpeg|png|webp|heic|heif|tiff|bmp|avif)$/i;
@@ -80,7 +81,10 @@ function enqueue(ctx, session, fileId, name) {
 }
 
 export function createBot() {
-  const bot = new Telegraf(config.botToken, { handlerTimeout: 15 * 60 * 1000 });
+  const bot = new Telegraf(config.botToken, {
+    handlerTimeout: 15 * 60 * 1000,
+    telegram: telegramAgent ? { agent: telegramAgent } : undefined,
+  });
 
   bot.start(async (ctx) => {
     await clearSession(ctx.chat.id);

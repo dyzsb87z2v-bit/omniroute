@@ -53,6 +53,30 @@ Commands: `/start`, `/help`, `/status`, `/reset`.
 > originals as *files* (documents) and the bot works from the full-resolution source — the bot
 > accepts both and says so in its welcome message.
 
+## Behind a proxy
+
+Where `api.telegram.org` is blocked, point the bot at a proxy and both the Telegram connection
+and the photo downloads go through it:
+
+```env
+PROXY_URL=http://127.0.0.1:2080          # or socks5://user:pass@127.0.0.1:1080
+```
+
+If `PROXY_URL` is empty the shell's `HTTPS_PROXY` / `ALL_PROXY` is used when present; set
+`PROXY_URL=none` to force a direct connection. Check it before starting the bot:
+
+```bash
+npm run check-proxy                       # probes api.telegram.org through the current setting
+```
+
+```
+proxy: http://127.0.0.1:2080
+telegraf agent: configured
+probing https://api.telegram.org …
+
+  reachable — HTTP 200
+```
+
 ## Optional AI layer
 
 Detection has two layers. The heuristic one above always runs. Dropping a key into `.env`:

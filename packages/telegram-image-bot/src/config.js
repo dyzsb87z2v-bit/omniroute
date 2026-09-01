@@ -25,6 +25,22 @@ function bool(name, fallback) {
   return /^(1|true|yes|on)$/i.test(raw.trim());
 }
 
+/**
+ * Proxy URL for outbound traffic. An explicit PROXY_URL wins; otherwise the conventional
+ * shell variables are honoured. Set PROXY_URL=none to opt out of an inherited proxy.
+ */
+function resolveProxyUrl() {
+  const explicit = process.env.PROXY_URL?.trim();
+  if (explicit && /^(none|off|false|0)$/i.test(explicit)) return "";
+  return (
+    explicit ||
+    process.env.HTTPS_PROXY?.trim() ||
+    process.env.https_proxy?.trim() ||
+    process.env.ALL_PROXY?.trim() ||
+    ""
+  );
+}
+
 export const config = {
   botToken: process.env.BOT_TOKEN?.trim() || "",
 
@@ -81,6 +97,10 @@ export const config = {
     // Sessions idle for longer than this are dropped with their temp files.
     sessionTtlMs: int("SESSION_TTL_MS", 60 * 60 * 1000),
   },
+
+  // Route every outbound call through a proxy. Falls back to the conventional env vars so an
+  // already-proxied shell needs no extra configuration.
+  proxyUrl: resolveProxyUrl(),
 
   workDir: process.env.WORK_DIR || path.join(os.tmpdir(), "telegram-image-bot"),
   logLevel: (process.env.LOG_LEVEL || "info").toLowerCase(),
