@@ -14,7 +14,8 @@
 
 import type { CostModel } from "./positionSizing";
 import { DEFAULT_COST_MODEL } from "./positionSizing";
-import type { OrderType, Quote, Side } from "./types";
+import type { OrderType } from "./providers/types";
+import type { Quote, Side } from "./types";
 
 export type PaperOrderStatus = "pending" | "filled" | "cancelled" | "rejected";
 
