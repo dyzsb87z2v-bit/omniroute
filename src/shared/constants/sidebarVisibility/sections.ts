@@ -312,6 +312,17 @@ const INTEGRATIONS_GROUP: SidebarItemGroup = {
       labelFallback: "Log export",
       subtitleFallback: "Ship call logs out",
     },
+    {
+      id: "trading",
+      href: "/dashboard/trading",
+      i18nKey: "trading",
+      subtitleKey: "tradingSubtitle",
+      icon: "candlestick_chart",
+      // Fallbacks keep this out of the i18n catalogue until it is translated,
+      // the same pattern log-export uses.
+      labelFallback: "Trading terminal",
+      subtitleFallback: "Signals, risk and trade plans",
+    },
   ],
 };
 

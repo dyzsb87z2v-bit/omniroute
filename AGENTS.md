@@ -56,7 +56,7 @@ Repository map and Reference Documentation sections below.
 | Translators   | `open-sse/translator/`  | Format conversion (OpenAI↔Claude↔Gemini)                                                                                                                                  |
 | Transformer   | `open-sse/transformer/` | Responses API ↔ Chat Completions                                                                                                                                          |
 | Services      | `open-sse/services/`    | Combo routing, rate limits, caching, etc                                                                                                                                  |
-| Database      | `src/lib/db/`           | SQLite domain modules (167 migrations)                                                                                                                                    |
+| Database      | `src/lib/db/`           | SQLite domain modules (168 migrations)                                                                                                                                    |
 | Domain/Policy | `src/domain/`           | Policy engine, cost rules, fallback logic                                                                                                                                 |
 | MCP Server    | `open-sse/mcp-server/`  | 110 tools (45 canonical + memory/skill/GitHub/pool/gamification/plugin/Notion/Obsidian/local-corpus/RTK modules), 3 transports (stdio / SSE / Streamable HTTP), 33 scopes |
 | A2A Server    | `src/lib/a2a/`          | JSON-RPC 2.0 agent protocol                                                                                                                                               |
@@ -448,6 +448,7 @@ For any non-trivial change, read the matching deep-dive first:
 | VS Code Copilot Chat (OmniCopilot extension)  | `docs/guides/VSCODE-COPILOT.md`                         |
 | Release flow                                  | `docs/ops/RELEASE_CHECKLIST.md`                         |
 | Embedded services                             | `docs/frameworks/EMBEDDED-SERVICES.md`                  |
+| Trading terminal (signals / risk / backtest)  | `docs/frameworks/TRADING-TERMINAL.md`                   |
 | Quality gates (~90 scripts, allowlist policy) | `docs/architecture/QUALITY_GATES.md`                    |
 
 ---

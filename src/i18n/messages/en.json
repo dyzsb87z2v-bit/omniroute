@@ -1027,6 +1027,8 @@
     "webhooksSubtitle": "Get notified of events",
     "logExport": "Log export",
     "logExportSubtitle": "Ship call logs out",
+    "trading": "Trading terminal",
+    "tradingSubtitle": "Signals, risk and trade plans",
     "combosSubtitle": "Group providers for failover",
     "batchSubtitle": "Process multiple requests",
     "contextCavemanSubtitle": "Prompt compression",
