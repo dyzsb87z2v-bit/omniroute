@@ -205,12 +205,14 @@ and live execution stays off unless an operator turns it on.
 All routes require `requireManagementAuth`, validate with Zod, and route errors
 through `sanitizeErrorMessage()` (Hard Rule #12).
 
-| Route                        | Method  | Purpose                                   |
-| ---------------------------- | ------- | ----------------------------------------- |
-| `/api/trading/status`        | GET     | Which provider kinds are configured (§42) |
-| `/api/trading/analyze`       | POST    | Full pipeline + Copilot evidence packet   |
-| `/api/trading/position-size` | POST    | Sizing with true maximum loss             |
-| `/api/trading/risk-settings` | GET/PUT | Read/update risk limits                   |
+| Route                        | Method  | Purpose                                     |
+| ---------------------------- | ------- | ------------------------------------------- |
+| `/api/trading/status`        | GET     | Which provider kinds are configured (§42)   |
+| `/api/trading/analyze`       | POST    | Full pipeline + Copilot evidence packet     |
+| `/api/trading/position-size` | POST    | Sizing with true maximum loss               |
+| `/api/trading/risk-settings` | GET/PUT | Read/update risk limits                     |
+| `/api/trading/demo-series`   | GET     | Synthetic SIMULATED series for the UI (§32) |
+| `/api/trading/copilot`       | POST    | Model narrative over the evidence packet    |
 
 `/api/trading/analyze` takes candles in the request rather than fetching them,
 so it works with any provider. `riskPerTradeFraction` is capped at `0.1` in the
@@ -218,7 +220,54 @@ route schema as well as in the engine.
 
 ---
 
-## 10. Database
+## 10. User interface
+
+`/dashboard/trading` (`src/app/(dashboard)/dashboard/trading/`). Desktop layout
+per spec §33: status strip on top, watchlist left, chart centre, Copilot right,
+docked analysis panels below.
+
+| Component        | Role                                                                              |
+| ---------------- | --------------------------------------------------------------------------------- |
+| `StatusStrip`    | Equity, daily P&L, loss budget, session, **data status**, risk status             |
+| `CandleChart`    | SVG candlesticks + volume + EMA/VWAP overlays + S/R and trade levels + crosshair  |
+| `WatchlistPanel` | Symbol list with per-symbol score and state                                       |
+| `CopilotPanel`   | Signal score, per-factor bars with evidence, warnings, reasoning, model narrative |
+| `BottomPanels`   | Risk checklist, trade plan, structure, multi-timeframe                            |
+
+The chart is hand-written SVG rather than a library: recharts (already a
+dependency) has no candlestick mark, and price, volume, overlays and trade
+levels need to share one coordinate space with a crosshair reading all of them.
+
+Two rendering details that matter: the price scale is padded to the extremes of
+the **wicks** so a long wick is never clipped, and overlay paths start a new
+sub-path after every null so an indicator warm-up gap is a break in the line
+rather than a straight segment across it.
+
+### Honesty in the UI
+
+- The data-status pill is the most prominent element on the page. `STALE` and
+  `UNAVAILABLE` render red; `SIMULATED` renders amber.
+- With no market-data adapter configured the page shows the provider's
+  `unavailableMessage` verbatim and states that the chart below is synthetic.
+- Watchlist rows show an em dash, never `0.00`, for values not yet computed.
+- The score bar is labelled "factor agreement (not a win probability)".
+
+### Demo mode
+
+`/api/trading/demo-series` returns a seeded, deterministic synthetic series
+stamped `SIMULATED` **server-side**, so a client cannot present it as live.
+Because `SIMULATED` is not a tradeable status, the freshness gate disables live
+analysis and the risk engine returns BLOCKED — the demo exercises the safety
+property rather than bypassing it. Verified end to end: the terminal renders a
+full chart and a complete 13-row risk checklist while refusing a tradeable
+verdict.
+
+This exists so the interface is usable before a real adapter is written. It is
+not a data provider and must never become one.
+
+---
+
+## 11. Database
 
 Migration `171_trading_terminal.sql`, 16 tables.
 
@@ -233,7 +282,7 @@ application code.
 
 ---
 
-## 11. Testing
+## 12. Testing
 
 ```bash
 node --import tsx/esm --import ./tests/_setup/isolateDataDir.ts \
@@ -256,15 +305,17 @@ node --import tsx/esm --import ./tests/_setup/isolateDataDir.ts \
 
 ---
 
-## 12. Not yet built
+## 13. Not yet built
 
 Stated plainly so nobody mistakes scope for completeness:
 
 - **No provider adapters.** The contracts and registry exist; no vendor is
   implemented, so no live data flows yet.
-- **No UI.** The dashboard terminal, charting, watchlist and scanner surfaces
-  (spec §33) are not built. New dashboard pages must also satisfy the
-  `i18n-ui-coverage` CI gate.
+- **No scanner surface.** The terminal ships watchlist, chart, Copilot and the
+  analysis panels; the market-wide scanner (spec §27) is not built.
+- **No drawing tools** on the chart (trendlines, freehand annotations).
+- **No paper-trading or journal UI.** Both engines exist and are tested; neither
+  has a screen yet.
 - **No streaming runtime.** `MarketDataProvider.subscribe()` is defined but no
   reconnect/backpressure loop consumes it.
 - **No alert dispatcher.** `trading_alerts` is modelled; nothing evaluates it.
