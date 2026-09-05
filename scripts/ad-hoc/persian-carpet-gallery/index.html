@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#070605" />
+    <title>MiLAEDiA Berlin</title>
+    <!-- Loaded without blocking: a stylesheet in <head> holds up script execution, and
+         fonts.googleapis.com is unreachable from some networks — which would stall the gallery
+         itself, not just its lettering. The fallback stack carries the design either way. -->
+    <link
+      rel="stylesheet"
+      media="print"
+      onload="
+        this.media = 'all';
+        this.onload = null;
+      "
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Jost:wght@200;300&display=swap"
+    />
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #070605;
+        overflow: hidden;
+        overscroll-behavior: none;
+      }
+      /* The gallery fills the window here; inside a site it is sized by its own container. */
+      #gallery {
+        height: 100dvh;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="gallery" data-milaedia-gallery data-src="gallery.png"></div>
+    <script src="gallery.js"></script>
+  </body>
+</html>
