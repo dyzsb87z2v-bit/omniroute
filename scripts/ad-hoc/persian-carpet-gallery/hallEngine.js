@@ -70,6 +70,7 @@ let IMG_W,
   TRAVEL_X,
   ALCOVE_SET;
 let activeKey = null;
+let mounted = 0;
 
 const FRONT_Z = 1.0;
 const NEAR = 0.1;
@@ -437,6 +438,7 @@ function loadImage(src) {
  */
 export function mountHall(root, options = {}) {
   applyConfig(options.geometry, options.alcoves);
+  mounted++;
   const doc = root.ownerDocument;
   const stage = doc.createElement("div");
   // pan-y, not none: the hall can fill a whole screen, and a page that navigates by scrolling
@@ -471,7 +473,12 @@ export function mountHall(root, options = {}) {
     alcoves,
     ready: null,
     destroy() {
+      if (disposed) return;
       disposed = true;
+      // The geometry lives in module state, so it is only safe to accept a different
+      // configuration once nothing is using the current one. Releasing it here is what lets a
+      // calibration page re-mount the same hall with new numbers.
+      if (--mounted === 0) activeKey = null;
       for (const f of off.splice(0)) {
         try {
           f();

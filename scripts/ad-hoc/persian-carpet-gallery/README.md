@@ -85,7 +85,8 @@ hall render is 900x1100 (aspect 0.8182); the reconstruction expects 0.5581
 ```
 
 A second hall mounted with different numbers in the same document is also rejected: the geometry
-lives in module state, so two configurations cannot coexist.
+lives in module state, so two configurations cannot coexist. Tearing every hall down releases
+it, so a calibration page can re-mount the same hall with new numbers after each change.
 
 ---
 
