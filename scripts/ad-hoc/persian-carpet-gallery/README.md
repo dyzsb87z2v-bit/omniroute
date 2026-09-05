@@ -9,10 +9,18 @@ because the texture is read back through a canvas).
 
 ```
 scripts/ad-hoc/persian-carpet-gallery/
-├── index.html    markup, styling, loading screen
-├── gallery.js    the whole engine — raw WebGL 2, no dependencies
-└── gallery.png   the reference photograph, 941 × 1672, untouched
+├── index.html             markup, styling, loading screen
+├── gallery.js             the whole engine — raw WebGL 2, no dependencies
+├── gallery.png            the reference photograph, 941 × 1672, untouched
+└── build-standalone.mjs   bundles all three into one self-contained file
 ```
+
+`node build-standalone.mjs` inlines the styles, the engine and the photograph (as a data URI)
+into a single 3.3 MB HTML file with nothing to fetch at runtime — drop it on any static host.
+
+The photograph stays PNG on purpose. At JPEG q98 the compression error is 1.50/255, roughly
+fifteen times the whole render pipeline's error against the source (0.10/255); it would become
+the dominant loss in a piece whose entire premise is that the carpets are untouched.
 
 ---
 
