@@ -13,43 +13,124 @@
  */
 
 /* ------------------------------------------------------------------ *
- * 1. Measured scene constants
+ * 1. Scenes
+ *
+ * A scene is a photograph plus the metric reconstruction solved from it. Both sets of numbers
+ * below were measured out of their own image, never assumed — see README.md for the working.
  * ------------------------------------------------------------------ */
-
-const IMG_W = 941;
-const IMG_H = 1672;
-const ASPECT = IMG_W / IMG_H; // 0.56280
-
-const HORIZON = 0.355; // horizon line, normalised image y (from the carpet cross-ratio)
-const TEXT = 1.446; // world height spanned per unit depth (vertical field)
-const EYE = 1.55; // camera height above the floor, metres
-
-const FLOOR_Y = -EYE; // floor plane, relative to eye level
-const CEIL_Y = 2.25; // ceiling plane (banner hangs from it at 9 m — verified)
-const WALL_X = 2.8; // side walls; corners land in the dark column gaps at x 0.2225 / 0.7775
-const BACK_Z = -12.4; // back wall
-const FRONT_Z = 1.0; // surfaces extend a little behind the camera for lateral travel
 
 const NEAR = 0.1;
 const FAR = 60.0;
 
-/* Camera envelope. Kept deliberately tight: beyond this the frame would ask for scenery
- * that simply does not exist in the photograph. */
-const TRAVEL_X = 0.55; // metres of lateral truck each way
+/* Camera envelope. Kept deliberately tight: beyond this the frame would ask for scenery that
+ * simply does not exist in the photograph. */
+let TRAVEL_X = 0.55; // metres of lateral truck each way; per scene, see useScene()
 const TRAVEL_Y = 0.1; // metres of vertical rise/fall
 /* The camera keeps looking slightly back toward the room's axis as it trucks. That costs
  * nothing in parallax — parallax comes from the translation — but it swings the frustum edge
  * back inside the photograph, which is what decides how much of the frame falls off the
- * original image. With these values everything past ~7 m stays fully covered. */
+ * original image. */
 const LOOK_BIAS = 0.18; // fraction of the truck the aim point follows
 const LOOK_PIVOT = 7.2; // metres ahead that the aim point sits
 
+const SCENES = {
+  /* The furnished MiLAEDiA hall. Horizon from the hero carpet's cross-ratio; the field solves
+   * that carpet to 1.65 x 3.95 m. Confirmed twice: a 2.25 m ceiling reaches image row 0.182 at
+   * 9 m, exactly where the banner hangs and occludes it, and a 12.4 m back wall makes the far
+   * carpet 1.27 x 2.43 m with its hem 7 cm off the floor. */
+  milaedia: {
+    src: "gallery.png",
+    width: 941,
+    height: 1672,
+    horizon: 0.355,
+    field: 1.446,
+    eye: 1.55,
+    ceiling: 2.25,
+    wallX: 2.8, // corners land at image x 0.2225 / 0.7775, inside the dark column gaps
+    backZ: -12.4,
+    travelX: 0.55,
+    cards: null, // filled in below
+    alcoves: [],
+  },
+
+  /* The empty showroom render the site already serves as its portrait hall. Horizon 0.4423
+   * from the two identical left-wall alcoves at different depths — their height ratio is
+   * 1.431, and the top and bottom edges independently give the same horizon. At a 70 degree
+   * vertical field the centre alcove comes out 1.51 x 2.77 m sitting 0.71 m off the floor, and
+   * a 2.0 m ceiling meets the back wall at image row 0.301 — exactly where that alcove starts.
+   *
+   * The room is empty by design so real stock can be composited into the alcoves, so it needs
+   * no occluder cards at all: five planes carry the whole scene. */
+  siteHall: {
+    src: "hall.jpg",
+    width: 768,
+    height: 1376,
+    horizon: 0.4423,
+    field: 1.4,
+    eye: 1.55,
+    ceiling: 2.0,
+    wallX: 1.3, // corners land at image x 0.335 / 0.665, inside the dark pillars
+    backZ: -10.1,
+    /* Gentler than the furnished hall. The nearest alcove sits only ~3.4 m away, and these
+     * alcoves hold real stock: at 0.55 m of travel the outermost one swings out of frame and
+     * a customer loses sight of a piece. 0.34 m keeps all five in view and still reads as
+     * a room you are walking through. */
+    travelX: 0.34,
+    cards: [],
+    /* The site's own alcove rectangles, in the order its GalleryHall uses them:
+     * far left, near left, centre, near right, far right. Each is pinned to the wall plane it
+     * actually hangs on, so it moves with that wall and can never drift off it. */
+    alcoves: [
+      { rect: [0.148, 0.368, 0.198, 0.484], plane: "left" },
+      { rect: [0.006, 0.336, 0.09, 0.502], plane: "left" },
+      { rect: [0.384, 0.306, 0.576, 0.502], plane: "back" },
+      { rect: [0.91, 0.336, 0.994, 0.502], plane: "right" },
+      { rect: [0.802, 0.368, 0.852, 0.484], plane: "right" },
+    ],
+  },
+};
+
+/* The active scene's numbers, published as module bindings so every routine below reads them
+ * without threading a parameter through. Geometry, masks and the backplate are all built once
+ * during mount, so one gallery at a time owns these; mount() refuses a second, different scene
+ * on the same page rather than letting two quietly corrupt each other. */
+let IMG_W, IMG_H, ASPECT, HORIZON, TEXT, EYE, FLOOR_Y, CEIL_Y, WALL_X, BACK_Z, CARDS, ALCOVES;
+const FRONT_Z = 1.0; // surfaces extend a little behind the camera for lateral travel
+let activeScene = null;
+
+function useScene(name) {
+  const s = SCENES[name];
+  if (!s) throw new Error(`MilaediaGallery: unknown scene "${name}"`);
+  if (activeScene && activeScene !== name) {
+    throw new Error(
+      `MilaediaGallery: scene "${activeScene}" is already mounted on this page; ` +
+        `two different scenes cannot run together.`
+    );
+  }
+  activeScene = name;
+  IMG_W = s.width;
+  IMG_H = s.height;
+  ASPECT = s.width / s.height;
+  HORIZON = s.horizon;
+  TEXT = s.field;
+  EYE = s.eye;
+  FLOOR_Y = -s.eye;
+  CEIL_Y = s.ceiling;
+  WALL_X = s.wallX;
+  BACK_Z = s.backZ;
+  TRAVEL_X = s.travelX;
+  CARDS = s.cards;
+  ALCOVES = s.alcoves;
+  return s;
+}
+
 /* ------------------------------------------------------------------ *
- * 2. Occluding objects — silhouettes traced off the reference image
- *    (normalised image coordinates, y measured downward from the top)
+ * 2. Occluding objects in the furnished hall — silhouettes traced off the reference image
+ *    (normalised image coordinates, y measured downward from the top).
+ *    The empty showroom needs none of this: nothing stands in front of its walls.
  * ------------------------------------------------------------------ */
 
-const CARDS = [
+SCENES.milaedia.cards = [
   {
     // MiLAEDiA banner. Hangs from the ceiling, so it is the one card given an explicit depth
     // instead of a floor contact line — 8.7 m puts it just in front of where the ceiling
@@ -201,23 +282,12 @@ const m4 = {
 
   /** Off-axis ("shift lens") frustum — reproduces the photograph's raised horizon. */
   frustum(l, r, b, t, n, f) {
+    // prettier-ignore
     return new Float32Array([
-      (2 * n) / (r - l),
-      0,
-      0,
-      0,
-      0,
-      (2 * n) / (t - b),
-      0,
-      0,
-      (r + l) / (r - l),
-      (t + b) / (t - b),
-      -(f + n) / (f - n),
-      -1,
-      0,
-      0,
-      (-2 * f * n) / (f - n),
-      0,
+      (2 * n) / (r - l), 0, 0, 0,
+      0, (2 * n) / (t - b), 0, 0,
+      (r + l) / (r - l), (t + b) / (t - b), -(f + n) / (f - n), -1,
+      0, 0, (-2 * f * n) / (f - n), 0,
     ]);
   },
 
@@ -306,6 +376,53 @@ function cardPlane(card) {
   let c = nx * p0[0] + nz * p0[2];
   c -= Math.sign(c || 1) * CARD_LIFT;
   return { n: [nx, 0, nz], c, depth: (floorDepth(a[1]) + floorDepth(b[1])) / 2 };
+}
+
+/** The wall plane an alcove hangs on. Sharing these planes with the room surfaces is what
+ *  guarantees an alcove can never drift off its wall, whatever the camera does. */
+const ALCOVE_PLANES = {
+  left: () => ({ n: [1, 0, 0], c: -WALL_X, depth: WALL_X }),
+  right: () => ({ n: [1, 0, 0], c: WALL_X, depth: WALL_X }),
+  back: () => ({ n: [0, 0, 1], c: BACK_Z, depth: -BACK_Z }),
+};
+
+/** An alcove's four world-space corners, in the order TL, TR, BR, BL. */
+function alcoveCorners(alcove) {
+  const make = ALCOVE_PLANES[alcove.plane];
+  if (!make) throw new Error(`MilaediaGallery: unknown alcove plane "${alcove.plane}"`);
+  const plane = make();
+  const [x0, y0, x1, y1] = alcove.rect;
+  return [
+    planePoint(plane, x0, y0),
+    planePoint(plane, x1, y0),
+    planePoint(plane, x1, y1),
+    planePoint(plane, x0, y1),
+  ];
+}
+
+/**
+ * Projective map taking the box (0,0)-(w,h) onto four screen points, as a CSS matrix3d.
+ * The alcove's content is then warped exactly the way the wall behind it is, so a carpet hung
+ * in a side alcove keystones correctly instead of sliding about as a flat rectangle.
+ */
+function quadMatrix(q, w, h) {
+  const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = q;
+  const sx1 = x1 - x2;
+  const sx2 = x3 - x2;
+  const sx3 = x0 - x1 + x2 - x3;
+  const sy1 = y1 - y2;
+  const sy2 = y3 - y2;
+  const sy3 = y0 - y1 + y2 - y3;
+  const den = sx1 * sy2 - sx2 * sy1;
+  if (!den) return null;
+  const g = (sx3 * sy2 - sx2 * sy3) / den;
+  const hh = (sx1 * sy3 - sx3 * sy1) / den;
+  const a = x1 - x0 + g * x1;
+  const b = x3 - x0 + hh * x3;
+  const d = y1 - y0 + g * y1;
+  const e = y3 - y0 + hh * y3;
+  // fold the element's own size in, so (0,0)-(w,h) maps rather than the unit square
+  return `matrix3d(${a / w},${d / w},0,${g / w},${b / h},${e / h},0,${hh / h},0,0,1,0,${x0},${y0},0,1)`;
 }
 
 /** Image point projected onto a card's plane. */
@@ -1171,6 +1288,16 @@ const STYLE = `
 }
 .${NS}-bar { width: 132px; height: 1px; background: rgba(201, 168, 106, 0.15); overflow: hidden; }
 .${NS}-bar > i { display: block; height: 100%; width: 0%; background: #c9a86a; transition: width 0.3s ease; }
+.${NS}-alcove {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+  z-index: 1;
+  backface-visibility: hidden;
+}
+.${NS}-alcove[hidden] { display: none; }
 .${NS}-hint {
   position: absolute;
   left: 50%;
@@ -1253,9 +1380,12 @@ function buildDom(root, labels) {
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
 
-function loadImage(src) {
+function loadImage(src, crossOrigin) {
   return new Promise((resolve, reject) => {
     const im = new Image();
+    // WebGL refuses to upload a cross-origin image that was not fetched with CORS, so ask for
+    // it whenever the photograph lives on another origin.
+    if (crossOrigin) im.crossOrigin = crossOrigin;
     im.decoding = "async";
     im.onload = () => resolve(im);
     im.onerror = () => reject(new Error("could not load the gallery photograph"));
@@ -1284,11 +1414,12 @@ function mount(target, options = {}) {
   if (!root) throw new Error("MilaediaGallery.mount: no such element " + target);
 
   const labels = { ...DEFAULT_LABELS, ...(options.labels || {}) };
+  const scene = useScene(options.scene || root.dataset.scene || "milaedia");
   const src =
     options.src ||
     root.dataset.src ||
     (typeof window !== "undefined" && window.MILAEDIA_SRC) ||
-    "gallery.png";
+    scene.src;
 
   // The piece is composed 9:16. Unless the host has already given the container a height,
   // present it as a portrait panel that stays within the viewport on a desktop page. The test
@@ -1303,10 +1434,26 @@ function mount(target, options = {}) {
   }
 
   const dom = buildDom(root, labels);
+
+  /* One positioned element per alcove, warped onto its wall every frame. The host fills them
+   * with whatever it likes — a React portal carrying the real product tile, say — and the
+   * gallery only ever moves them. */
+  const alcoves = ALCOVES.map((a) => {
+    const el = root.ownerDocument.createElement("div");
+    el.className = `${NS}-alcove`;
+    el.style.width = `${Math.round((a.rect[2] - a.rect[0]) * IMG_W)}px`;
+    el.style.height = `${Math.round((a.rect[3] - a.rect[1]) * IMG_H)}px`;
+    el.hidden = true;
+    dom.stage.appendChild(el);
+    return el;
+  });
+
   const disposers = [];
   let disposed = false;
 
   const handle = {
+    /** The alcove elements, in the scene's own order. Render into these. */
+    alcoves,
     destroy() {
       disposed = true;
       for (const off of disposers.splice(0)) {
@@ -1328,7 +1475,7 @@ function mount(target, options = {}) {
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
           io.disconnect();
-          run(root, dom, src, options, labels, disposers, () => disposed).catch((err) =>
+          run(root, dom, alcoves, src, options, labels, disposers, () => disposed).catch((err) =>
             showFailure(dom, err)
           );
         }
@@ -1338,7 +1485,7 @@ function mount(target, options = {}) {
     io.observe(root);
     disposers.push(() => io.disconnect());
   } else {
-    run(root, dom, src, options, labels, disposers, () => disposed).catch((err) =>
+    run(root, dom, alcoves, src, options, labels, disposers, () => disposed).catch((err) =>
       showFailure(dom, err)
     );
   }
@@ -1352,7 +1499,7 @@ function showFailure(dom, err) {
   dom.bootEl.classList.add(`${NS}-gone`);
 }
 
-async function run(root, dom, src, options, labels, disposers, isDisposed) {
+async function run(root, dom, alcoves, src, options, labels, disposers, isDisposed) {
   const { stage, canvas, hint, bootEl, bar, fail } = dom;
   const progress = (p) => {
     bar.style.width = Math.round(p * 100) + "%";
@@ -1375,7 +1522,8 @@ async function run(root, dom, src, options, labels, disposers, isDisposed) {
   }
 
   progress(0.08);
-  const photo = await loadImage(src);
+  const sameOrigin = !/^https?:\/\//i.test(src) || src.startsWith(location.origin);
+  const photo = await loadImage(src, sameOrigin ? null : options.crossOrigin || "anonymous");
   if (isDisposed()) return;
   progress(0.42);
   await nextFrame();
@@ -1384,7 +1532,10 @@ async function run(root, dom, src, options, labels, disposers, isDisposed) {
   progress(0.56);
   await nextFrame();
 
-  const backplateCanvas = buildBackplate(photo, masks);
+  // A scene with nothing standing in front of its walls has no holes to fill, so it skips the
+  // backplate entirely — no inpainting, and no canvas read-back that a cross-origin photograph
+  // would not be allowed to perform anyway.
+  const plateSource = CARDS.length ? buildBackplate(photo, masks) : photo;
   progress(0.86);
   await nextFrame();
   if (isDisposed()) return;
@@ -1401,7 +1552,7 @@ async function run(root, dom, src, options, labels, disposers, isDisposed) {
     : null;
 
   const texPhoto = makeImageTexture(gl, photo, aniso);
-  const texPlate = makeImageTexture(gl, backplateCanvas, aniso);
+  const texPlate = CARDS.length ? makeImageTexture(gl, plateSource, aniso) : null;
 
   const scene = program(gl, SCENE_VS, SCENE_FS);
   const post = program(gl, POST_VS, POST_FS);
@@ -1435,6 +1586,15 @@ async function run(root, dom, src, options, labels, disposers, isDisposed) {
       phase: i * 2.1,
     };
   }).sort((a, b) => b.depth - a.depth); // painted far to near
+
+  /* Alcove corners in world space, resolved once. Each sits on the very plane its wall is
+   * drawn on, so the two can only ever move together. */
+  const alcoveGeom = ALCOVES.map((a, i) => ({
+    el: alcoves[i],
+    corners: alcoveCorners(a),
+    w: Math.max(1, Math.round((a.rect[2] - a.rect[0]) * IMG_W)),
+    h: Math.max(1, Math.round((a.rect[3] - a.rect[1]) * IMG_H)),
+  }));
 
   /* --- render target with a depth texture (used by the defocus pass) --- */
   let fbo = null,
@@ -1510,6 +1670,8 @@ async function run(root, dom, src, options, labels, disposers, isDisposed) {
    * falls back to a letterboxed panel instead of butchering the composition. */
   const MAX_PIXELS = 3.1e6;
   const OVERSCAN = 1.26;
+  let stageW = 0;
+  let stageH = 0;
   function resize() {
     const vw = Math.max(2, root.clientWidth);
     const vh = Math.max(2, root.clientHeight);
@@ -1524,6 +1686,8 @@ async function run(root, dom, src, options, labels, disposers, isDisposed) {
       w = Math.round(w * need);
       h = Math.round(h * need);
     }
+    stageW = w;
+    stageH = h;
     stage.style.width = w + "px";
     stage.style.height = h + "px";
     // whole-pixel placement — a fractional offset would resample the entire frame
@@ -1575,7 +1739,8 @@ async function run(root, dom, src, options, labels, disposers, isDisposed) {
 
   on(stage, "pointerdown", (e) => {
     if (pointerId !== null) return;
-    e.preventDefault();
+    // Deliberately no preventDefault here: it would suppress the compatibility click, and
+    // alcove content is clickable. mousedown above already stops focus-scroll and selection.
     root.focus({ preventScroll: true });
     pointerId = e.pointerId;
     stage.setPointerCapture(pointerId);
@@ -1652,6 +1817,33 @@ async function run(root, dom, src, options, labels, disposers, isDisposed) {
 
     const mvp = m4.multiply(proj, m4.view(cam.viewX, cam.viewY, 0, cam.yaw));
     const motion = cam.motion;
+
+    // Warp each alcove onto its wall. Behind the camera (w <= 0) it is hidden rather than
+    // projected, which would otherwise fling it across the screen.
+    for (const a of alcoveGeom) {
+      const pts = [];
+      let ok = true;
+      for (const p of a.corners) {
+        const cw = mvp[3] * p[0] + mvp[7] * p[1] + mvp[11] * p[2] + mvp[15];
+        if (cw <= 1e-4) {
+          ok = false;
+          break;
+        }
+        const cx = mvp[0] * p[0] + mvp[4] * p[1] + mvp[8] * p[2] + mvp[12];
+        const cy = mvp[1] * p[0] + mvp[5] * p[1] + mvp[9] * p[2] + mvp[13];
+        pts.push([
+          (cx / cw) * 0.5 * stageW + stageW * 0.5,
+          stageH * 0.5 - (cy / cw) * 0.5 * stageH,
+        ]);
+      }
+      const matrix = ok ? quadMatrix(pts, a.w, a.h) : null;
+      if (matrix) {
+        a.el.style.transform = matrix;
+        if (a.el.hidden) a.el.hidden = false;
+      } else if (!a.el.hidden) {
+        a.el.hidden = true;
+      }
+    }
     const swayRamp = Math.min(1, Math.max(0, (t - 0.6) / 2.6));
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -1676,7 +1868,7 @@ async function run(root, dom, src, options, labels, disposers, isDisposed) {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, texBlank);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texPlate);
+    gl.bindTexture(gl.TEXTURE_2D, texPlate || texPhoto);
     gl.uniform1f(scene.u.uUseMask, 0);
     gl.uniform1f(scene.u.uSway, 0);
     for (const s of surfaces) {

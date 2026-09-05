@@ -12,6 +12,7 @@ scripts/ad-hoc/persian-carpet-gallery/
 ├── index.html             markup, styling, loading screen
 ├── gallery.js             the whole engine — raw WebGL 2, no dependencies
 ├── gallery.png            the reference photograph, 941 × 1672, untouched
+├── hallEngine.js          reduced build: empty showroom + wall-pinned alcoves
 ├── embed-demo.html        reference: the gallery inside a page section
 └── build-standalone.mjs   bundles it into one self-contained file
 ```
@@ -22,6 +23,37 @@ into a single 3.3 MB HTML file with nothing to fetch at runtime — drop it on a
 The photograph stays PNG on purpose. At JPEG q98 the compression error is 1.50/255, roughly
 fifteen times the whole render pipeline's error against the source (0.10/255); it would become
 the dominant loss in a piece whose entire premise is that the carpets are untouched.
+
+---
+
+## Two scenes, and the showroom variant
+
+`gallery.js` carries two scenes, each with its own metric reconstruction solved from its own
+image. `mount(el, { scene })` picks one.
+
+- **`milaedia`** — the furnished hall documented below: carpets baked into the photograph, which
+  is why it needs silhouette masks and an inpainted backplate.
+- **`siteHall`** — an _empty_ showroom render, the kind a shop serves as a backdrop so real stock
+  can be composited into its alcoves. Nothing stands in front of its walls, so it needs no masks,
+  no inpainting and no cards: five planes carry the whole scene.
+
+Its numbers were measured the same way. Horizon **0.4423** comes from two identical left-wall
+alcoves at different depths — their image heights differ by 1.431x, and the top and bottom edges
+each give the same horizon independently. A 70-degree field then makes the centre alcove
+1.51 x 2.77 m sitting 0.71 m off the floor, and puts the ceiling/back-wall junction at image row
+0.301 — exactly where that alcove begins.
+
+### Alcoves that stay on the wall
+
+A scene may declare alcoves: rectangles in image space, each pinned to the wall plane it hangs
+on. `mount()` returns `handle.alcoves`, one element per alcove, warped onto its wall every frame
+by a CSS `matrix3d` homography. Because an alcove shares the plane its wall is _painted_ on, the
+two can only ever move together — a carpet keystones with the wall instead of sliding across it.
+Render whatever you like into those elements; the gallery only moves them.
+
+`hallEngine.js` is the reduced build of exactly this, for shipping into a product page: same
+maths and shaders, no furnished-hall machinery, one draw pass, no post-processing — about a third
+of the size.
 
 ---
 
