@@ -88,6 +88,29 @@ A second hall mounted with different numbers in the same document is also reject
 lives in module state, so two configurations cannot coexist. Tearing every hall down releases
 it, so a calibration page can re-mount the same hall with new numbers after each change.
 
+### One room, any window shape
+
+The reduced build reconstructs a room, not a picture of one, so the frame it is shown through is
+the host's choice. `options.layout(vw, vh, aspect)` returns `{ w, h, left, top }` for the stage,
+and overscanning it presents a window onto the same hall rather than a letterboxed copy of the
+photograph. An upright 9:16 render on a wide desktop, framed by
+
+```js
+const containW = Math.min(vw, vh * aspect);
+const zoom = Math.max(1, wantedByContent, vw / containW); // never narrower than the window
+```
+
+gives a wide view of that room: back wall centred, side alcoves receding, floor reflections
+below. Measured on a 1440x820 window it produces a 1440x2580 stage — full window width, the
+alcove band centred in it. The upright and the wide framing are the same mount with different
+numbers, so one render serves both and a sharper upload improves both.
+
+What this costs is magnification: a 768 px wide render across a 1440 px window is 1.9x, and the
+source has to be good enough to carry it. What it does not cost is fidelity at the frame edge —
+dragging to full travel on a wide window keeps the outer columns lit (mean luminance 6-31 of 255
+across rest and full travel, against 9-22 for the phone framing that ships), so no unpainted
+area enters.
+
 ---
 
 ## Embedding it in a site
