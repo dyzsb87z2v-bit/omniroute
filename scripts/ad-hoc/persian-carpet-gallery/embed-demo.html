@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>کالکشن فرش — نمونهٔ جاسازی</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Jost:wght@200;300&family=Vazirmatn:wght@300;500&display=swap"
+    />
+    <style>
+      /* This page is only a stand-in for a real site, so the gallery can be seen in context:
+         a section among other sections, with the page scrolling normally around it. */
+      :root {
+        --ink: #0d0b0a;
+        --paper: #f6f2ea;
+        --gold: #a8853f;
+        --muted: #6d655c;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: "Vazirmatn", system-ui, sans-serif;
+        font-weight: 300;
+        line-height: 1.9;
+      }
+      header,
+      section {
+        max-width: 1120px;
+        margin-inline: auto;
+        padding: 0 24px;
+      }
+      header {
+        padding-block: 96px 64px;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(30px, 5vw, 46px);
+        font-weight: 500;
+        text-wrap: balance;
+      }
+      header p {
+        margin: 0;
+        max-width: 58ch;
+        color: var(--muted);
+      }
+      .eyebrow {
+        margin: 0 0 14px;
+        font-family: "Jost", sans-serif;
+        font-size: 11px;
+        letter-spacing: 0.3em;
+        color: var(--gold);
+      }
+
+      .showroom {
+        padding-block: 40px 88px;
+      }
+      .showroom h2 {
+        margin: 0 0 6px;
+        font-size: 24px;
+        font-weight: 500;
+      }
+      .showroom p {
+        margin: 0 0 28px;
+        color: var(--muted);
+      }
+
+      /* The only rule the gallery needs from the host page. Everything else it handles itself:
+         it sizes to this box, and stays a portrait panel centred in the column on desktop. */
+      #carpet-collection {
+        border-radius: 2px;
+        box-shadow: 0 30px 80px -30px rgba(13, 11, 10, 0.55);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+        gap: 28px;
+        padding-block: 0 120px;
+      }
+      .card figure {
+        margin: 0 0 12px;
+        aspect-ratio: 3 / 4;
+        background: linear-gradient(150deg, #2a2320, #171310);
+      }
+      .card b {
+        display: block;
+        font-weight: 500;
+      }
+      .card span {
+        color: var(--muted);
+        font-size: 14px;
+      }
+      footer {
+        padding: 48px 24px 96px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <p class="eyebrow">MiLAEDiA &middot; BERLIN</p>
+      <h1>کالکشن فرش دست‌باف</h1>
+      <p>
+        هر تخته فرش این مجموعه در گره‌گاه‌های تبریز، کاشان و اصفهان بافته شده است. برای دیدن سالن،
+        در بخش زیر با انگشت بکشید.
+      </p>
+    </header>
+
+    <section class="showroom">
+      <h2>گشت مجازی سالن</h2>
+      <p>با کشیدن انگشت یا ماوس در سالن حرکت کنید.</p>
+
+      <!-- The drop-in. Two lines. -->
+      <div id="carpet-collection" data-milaedia-gallery data-src="gallery.png"></div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <figure></figure>
+        <b>تبریز، پشم و ابریشم</b><span>۳٫۹ × ۱٫۶۵ متر</span>
+      </article>
+      <article class="card">
+        <figure></figure>
+        <b>کاشان، لچک ترنج</b><span>۲٫۴ × ۱٫۸ متر</span>
+      </article>
+      <article class="card">
+        <figure></figure>
+        <b>اصفهان، ابریشم</b><span>۲٫۱ × ۱٫۳ متر</span>
+      </article>
+      <article class="card">
+        <figure></figure>
+        <b>نائین، نه‌لا</b><span>۳٫۰ × ۲٫۰ متر</span>
+      </article>
+    </section>
+
+    <footer>نمونهٔ جاسازی — صفحهٔ اطراف بخشی از تحویل نیست.</footer>
+
+    <script src="gallery.js"></script>
+  </body>
+</html>

@@ -7,186 +7,36 @@
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
     <meta name="theme-color" content="#070605" />
+    <title>MiLAEDiA Berlin</title>
+    <!-- Loaded without blocking: a stylesheet in <head> holds up script execution, and
+         fonts.googleapis.com is unreachable from some networks — which would stall the gallery
+         itself, not just its lettering. The fallback stack carries the design either way. -->
     <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23070605'/%3E%3Ctext x='8' y='12' font-size='11' text-anchor='middle' fill='%23c9a86a'%3EM%3C/text%3E%3C/svg%3E"
+      rel="stylesheet"
+      media="print"
+      onload="
+        this.media = 'all';
+        this.onload = null;
+      "
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Jost:wght@200;300&display=swap"
     />
-    <title>MiLAEDiA — Persian Carpet Gallery</title>
     <style>
-      :root {
-        --ink: #070605;
-        --gold: #c9a86a;
-      }
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
       html,
       body {
         height: 100%;
-        background: var(--ink);
+        margin: 0;
+        background: #070605;
         overflow: hidden;
         overscroll-behavior: none;
-        -webkit-tap-highlight-color: transparent;
       }
-      body {
-        display: grid;
-        place-items: center;
-        font-family: "Optima", "Palatino Linotype", Palatino, Georgia, serif;
-        color: var(--gold);
-        touch-action: none;
-      }
-
-      /* Positioned in whole pixels from script: a percentage transform can land the canvas on
-         a half pixel, which resamples the whole photograph. */
-      #stage {
-        position: absolute;
-        left: 0;
-        top: 0;
-        display: block;
-        touch-action: none;
-        cursor: grab;
-        box-shadow: 0 0 90px rgba(0, 0, 0, 0.9);
-      }
-      #stage.dragging {
-        cursor: grabbing;
-      }
-      canvas {
-        display: block;
-        width: 100%;
-        height: 100%;
-      }
-
-      /* --- loading --- */
-      #boot {
-        position: fixed;
-        inset: 0;
-        display: grid;
-        place-content: center;
-        justify-items: center;
-        gap: 18px;
-        background: var(--ink);
-        z-index: 20;
-        transition: opacity 0.9s ease 0.15s;
-      }
-      #boot.gone {
-        opacity: 0;
-        pointer-events: none;
-      }
-      #boot h1 {
-        font-size: 15px;
-        font-weight: 400;
-        letter-spacing: 0.42em;
-        text-indent: 0.42em;
-        opacity: 0.9;
-      }
-      #boot p {
-        font-size: 9.5px;
-        letter-spacing: 0.3em;
-        text-indent: 0.3em;
-        opacity: 0.42;
-      }
-      #bar {
-        width: 132px;
-        height: 1px;
-        background: rgba(201, 168, 106, 0.16);
-        overflow: hidden;
-      }
-      #bar i {
-        display: block;
-        height: 100%;
-        width: 0%;
-        background: var(--gold);
-        transition: width 0.3s ease;
-      }
-
-      /* --- swipe hint --- */
-      #hint {
-        position: absolute;
-        left: 50%;
-        bottom: 5.2%;
-        transform: translateX(-50%);
-        display: flex;
-        align-items: center;
-        gap: 13px;
-        font-size: 9px;
-        letter-spacing: 0.34em;
-        text-indent: 0.34em;
-        color: rgba(228, 208, 172, 0.62);
-        text-shadow: 0 1px 10px rgba(0, 0, 0, 0.95);
-        pointer-events: none;
-        opacity: 0;
-        transition: opacity 1s ease;
-        z-index: 10;
-        white-space: nowrap;
-      }
-      #hint.on {
-        opacity: 1;
-      }
-      #hint span {
-        animation: drift 3.4s ease-in-out infinite;
-      }
-      #hint span:last-child {
-        animation-delay: 1.7s;
-      }
-      @keyframes drift {
-        0%,
-        100% {
-          opacity: 0.25;
-          transform: translateX(0);
-        }
-        50% {
-          opacity: 1;
-          transform: translateX(-5px);
-        }
-      }
-      #hint span:last-child {
-        animation-name: driftR;
-      }
-      @keyframes driftR {
-        0%,
-        100% {
-          opacity: 0.25;
-          transform: translateX(0);
-        }
-        50% {
-          opacity: 1;
-          transform: translateX(5px);
-        }
-      }
-
-      #fail {
-        position: fixed;
-        inset: 0;
-        display: none;
-        place-content: center;
-        text-align: center;
-        padding: 32px;
-        font-size: 12px;
-        line-height: 2;
-        letter-spacing: 0.18em;
-        background: var(--ink);
-        z-index: 30;
+      /* The gallery fills the window here; inside a site it is sized by its own container. */
+      #gallery {
+        height: 100dvh;
       }
     </style>
   </head>
   <body>
-    <div id="stage">
-      <canvas id="gl"></canvas>
-      <div id="hint"><span>&#8592;</span>SWIPE TO WALK THE GALLERY<span>&#8594;</span></div>
-    </div>
-
-    <div id="boot">
-      <h1>MiLAEDiA</h1>
-      <div id="bar"><i></i></div>
-      <p>PERSIAN CARPETS &middot; BERLIN</p>
-    </div>
-
-    <div id="fail">
-      This experience needs WebGL&nbsp;2.<br />Please open it in a current browser.
-    </div>
-
+    <div id="gallery" data-milaedia-gallery data-src="gallery.png"></div>
     <script src="gallery.js"></script>
   </body>
 </html>

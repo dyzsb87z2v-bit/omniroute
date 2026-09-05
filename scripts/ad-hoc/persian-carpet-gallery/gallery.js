@@ -1088,30 +1088,280 @@ class Camera {
 }
 
 /* ------------------------------------------------------------------ *
- * 9. Application
+ * 9. Mounting
+ *
+ * The gallery lives inside whatever element it is given — it never touches the page around it.
+ * It measures its own container rather than the viewport, injects its styles once under a
+ * prefixed class name, listens on its own element instead of on window, defers loading the
+ * photograph until it is nearly in view, and stops rendering whenever it scrolls off screen.
+ * That is what makes it safe to drop into a section of an existing site.
  * ------------------------------------------------------------------ */
 
-const boot = document.getElementById("boot");
-const bar = document.querySelector("#bar i");
-const hint = document.getElementById("hint");
-const stage = document.getElementById("stage");
-const canvas = document.getElementById("gl");
+const NS = "mlg";
+const STYLE_ID = "mlg-style";
 
-const progress = (p) => {
-  bar.style.width = Math.round(p * 100) + "%";
-};
+/* Every property that a host theme is likely to set globally is stated explicitly here, so a
+ * stray `canvas { width: 100% }` or `* { box-sizing }` in the surrounding stylesheet cannot
+ * change the layout. */
+const STYLE = `
+.${NS}-root {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin-inline: auto;
+  overflow: hidden;
+  background: #070605;
+  color: #c9a86a;
+  /* Override with --mlg-font / --mlg-display-font to adopt the host site's typography.
+     The gallery itself requests no fonts, so an embed adds no third-party network calls. */
+  font-family: var(--mlg-font, "Jost", "Avenir Next", "Segoe UI", system-ui, sans-serif);
+  box-sizing: border-box;
+  touch-action: none;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+}
+.${NS}-root:focus-visible { outline: 1px solid rgba(201, 168, 106, 0.55); outline-offset: 3px; }
+.${NS}-stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: 0;
+  padding: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.${NS}-stage.${NS}-dragging { cursor: grabbing; }
+.${NS}-stage > canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+.${NS}-boot {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 18px;
+  background: #070605;
+  z-index: 2;
+  transition: opacity 0.9s ease 0.15s;
+}
+.${NS}-boot.${NS}-gone { opacity: 0; pointer-events: none; }
+.${NS}-boot b {
+  font-family: var(--mlg-display-font, "Cormorant Garamond", "Palatino Linotype", Palatino, Georgia, serif);
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  color: #c9a86a;
+}
+.${NS}-boot small {
+  font-size: 8.5px;
+  font-weight: 300;
+  letter-spacing: 0.42em;
+  text-indent: 0.42em;
+  color: #8a7448;
+}
+.${NS}-bar { width: 132px; height: 1px; background: rgba(201, 168, 106, 0.15); overflow: hidden; }
+.${NS}-bar > i { display: block; height: 100%; width: 0%; background: #c9a86a; transition: width 0.3s ease; }
+.${NS}-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 5.2%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin: 0;
+  font-size: 9px;
+  font-weight: 300;
+  letter-spacing: 0.34em;
+  text-indent: 0.34em;
+  white-space: nowrap;
+  color: rgba(228, 208, 172, 0.66);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.95);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1s ease;
+  z-index: 3;
+}
+.${NS}-hint.${NS}-on { opacity: 1; }
+.${NS}-hint i { font-style: normal; animation: ${NS}-drift 3.4s ease-in-out infinite; }
+.${NS}-hint i:last-child { animation-delay: 1.7s; }
+@keyframes ${NS}-drift {
+  0%, 100% { opacity: 0.22; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .${NS}-hint i { animation: none; opacity: 0.7; }
+}
+.${NS}-fail {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-content: center;
+  text-align: center;
+  padding: 28px;
+  font-size: 11px;
+  line-height: 2.2;
+  letter-spacing: 0.18em;
+  color: #8a7448;
+  background: #070605;
+  z-index: 4;
+}
+.${NS}-fail.${NS}-on { display: grid; }
+`;
+
+function injectStyle(doc) {
+  if (doc.getElementById(STYLE_ID)) return;
+  const el = doc.createElement("style");
+  el.id = STYLE_ID;
+  el.textContent = STYLE;
+  doc.head.appendChild(el);
+}
+
+function buildDom(root, labels) {
+  root.classList.add(`${NS}-root`);
+  root.setAttribute("tabindex", "0");
+  root.setAttribute("role", "application");
+  root.setAttribute("aria-label", labels.aria);
+  root.innerHTML = `
+    <div class="${NS}-stage"><canvas></canvas></div>
+    <p class="${NS}-hint"><i>&#8592;</i>${labels.hint}<i>&#8594;</i></p>
+    <div class="${NS}-boot">
+      <b>${labels.title}</b>
+      <div class="${NS}-bar"><i></i></div>
+      <small>${labels.subtitle}</small>
+    </div>
+    <div class="${NS}-fail">${labels.unsupported}</div>`;
+  return {
+    stage: root.querySelector(`.${NS}-stage`),
+    canvas: root.querySelector("canvas"),
+    hint: root.querySelector(`.${NS}-hint`),
+    bootEl: root.querySelector(`.${NS}-boot`),
+    bar: root.querySelector(`.${NS}-bar > i`),
+    fail: root.querySelector(`.${NS}-fail`),
+  };
+}
+
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     const im = new Image();
+    im.decoding = "async";
     im.onload = () => resolve(im);
-    im.onerror = () => reject(new Error("could not load " + src));
+    im.onerror = () => reject(new Error("could not load the gallery photograph"));
     im.src = src;
   });
 }
 
-async function main() {
+const DEFAULT_LABELS = {
+  title: "MiLAEDiA",
+  subtitle: "PERSIAN CARPETS &middot; BERLIN",
+  hint: "SWIPE TO WALK THE GALLERY",
+  aria: "Interactive Persian carpet gallery. Drag, or use the left and right arrow keys, to move through the room.",
+  unsupported: "This experience needs WebGL&nbsp;2.<br />Please open it in a current browser.",
+};
+
+/**
+ * Mount the gallery into an element.
+ *
+ *   MilaediaGallery.mount("#carpet-collection", { src: "/assets/gallery.png" })
+ *
+ * Returns a handle with destroy(). Everything is scoped to the element: no global listeners
+ * that outlive it, no styles that reach outside it, no scroll interception.
+ */
+function mount(target, options = {}) {
+  const root = typeof target === "string" ? document.querySelector(target) : target;
+  if (!root) throw new Error("MilaediaGallery.mount: no such element " + target);
+
+  const labels = { ...DEFAULT_LABELS, ...(options.labels || {}) };
+  const src =
+    options.src ||
+    root.dataset.src ||
+    (typeof window !== "undefined" && window.MILAEDIA_SRC) ||
+    "gallery.png";
+
+  // The piece is composed 9:16. Unless the host has already given the container a height,
+  // present it as a portrait panel that stays within the viewport on a desktop page. The test
+  // is the element's actual laid-out height, not its inline style — a host that sizes it from
+  // a stylesheet has still sized it, and its rules must win.
+  injectStyle(root.ownerDocument);
+  if (root.getBoundingClientRect().height < 4) {
+    const maxH = options.maxHeight || root.dataset.maxHeight || "88vh";
+    root.style.aspectRatio = options.aspect || root.dataset.aspect || `${IMG_W} / ${IMG_H}`;
+    root.style.maxHeight = maxH;
+    root.style.maxWidth = `calc(${maxH} * ${ASPECT})`;
+  }
+
+  const dom = buildDom(root, labels);
+  const disposers = [];
+  let disposed = false;
+
+  const handle = {
+    destroy() {
+      disposed = true;
+      for (const off of disposers.splice(0)) {
+        try {
+          off();
+        } catch {
+          /* a listener whose node is already gone is not an error */
+        }
+      }
+      root.innerHTML = "";
+      root.classList.remove(`${NS}-root`);
+    },
+  };
+
+  // Defer everything — including the photograph, which is the heavy part — until the section is
+  // nearly on screen, so a page that embeds this below the fold pays nothing up front.
+  if (typeof IntersectionObserver === "function" && options.eager !== true) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          io.disconnect();
+          run(root, dom, src, options, labels, disposers, () => disposed).catch((err) =>
+            showFailure(dom, err)
+          );
+        }
+      },
+      { rootMargin: "150% 0px" }
+    );
+    io.observe(root);
+    disposers.push(() => io.disconnect());
+  } else {
+    run(root, dom, src, options, labels, disposers, () => disposed).catch((err) =>
+      showFailure(dom, err)
+    );
+  }
+
+  return handle;
+}
+
+function showFailure(dom, err) {
+  console.error("[MiLAEDiA]", err);
+  dom.fail.classList.add(`${NS}-on`);
+  dom.bootEl.classList.add(`${NS}-gone`);
+}
+
+async function run(root, dom, src, options, labels, disposers, isDisposed) {
+  const { stage, canvas, hint, bootEl, bar, fail } = dom;
+  const progress = (p) => {
+    bar.style.width = Math.round(p * 100) + "%";
+  };
+  const on = (el, type, fn, opts) => {
+    el.addEventListener(type, fn, opts);
+    disposers.push(() => el.removeEventListener(type, fn, opts));
+  };
+
   const gl = canvas.getContext("webgl2", {
     alpha: false,
     antialias: false,
@@ -1119,13 +1369,14 @@ async function main() {
     powerPreference: "high-performance",
   });
   if (!gl) {
-    document.getElementById("fail").style.display = "grid";
-    boot.classList.add("gone");
+    fail.classList.add(`${NS}-on`);
+    bootEl.classList.add(`${NS}-gone`);
     return;
   }
 
   progress(0.08);
-  const photo = await loadImage("gallery.png");
+  const photo = await loadImage(src);
+  if (isDisposed()) return;
   progress(0.42);
   await nextFrame();
 
@@ -1136,6 +1387,7 @@ async function main() {
   const backplateCanvas = buildBackplate(photo, masks);
   progress(0.86);
   await nextFrame();
+  if (isDisposed()) return;
 
   /* --- resources --- */
   const anisoExt =
@@ -1259,8 +1511,8 @@ async function main() {
   const MAX_PIXELS = 3.1e6;
   const OVERSCAN = 1.26;
   function resize() {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const vw = Math.max(2, root.clientWidth);
+    const vh = Math.max(2, root.clientHeight);
     let w = vw;
     let h = Math.round(w / ASPECT);
     if (h > vh) {
@@ -1292,8 +1544,17 @@ async function main() {
     superSample = bw * bh < MAX_PIXELS * 0.42 ? 1.25 : 1.0;
     makeTargets(Math.round(bw * superSample), Math.round(bh * superSample));
   }
-  window.addEventListener("resize", resize, { passive: true });
-  window.addEventListener("orientationchange", () => setTimeout(resize, 120), { passive: true });
+  // The container is the authority on size, so watch the box rather than the window: the
+  // gallery then reflows correctly inside a column, a drawer or a resizing grid cell, not only
+  // when the browser window itself changes.
+  if (typeof ResizeObserver === "function") {
+    const ro = new ResizeObserver(resize);
+    ro.observe(root);
+    disposers.push(() => ro.disconnect());
+  } else {
+    on(window, "resize", resize, { passive: true });
+  }
+  on(window, "orientationchange", () => setTimeout(resize, 120), { passive: true });
   resize();
   progress(1);
 
@@ -1305,20 +1566,29 @@ async function main() {
 
   const rectW = () => stage.clientWidth || 1;
 
-  stage.addEventListener("pointerdown", (e) => {
+  // The gallery is focusable so it can be driven from the keyboard, but a panel this tall is
+  // rarely fully on screen — and the browser's default focus-on-mousedown scrolls a focused
+  // element into view, which would yank the page the instant a reader grabbed the gallery.
+  // Suppressing the default and focusing explicitly with preventScroll keeps the page still.
+  // It also stops text selection and the native image drag.
+  on(stage, "mousedown", (e) => e.preventDefault());
+
+  on(stage, "pointerdown", (e) => {
     if (pointerId !== null) return;
+    e.preventDefault();
+    root.focus({ preventScroll: true });
     pointerId = e.pointerId;
     stage.setPointerCapture(pointerId);
-    stage.classList.add("dragging");
+    stage.classList.add(`${NS}-dragging`);
     last = { x: e.clientX, y: e.clientY, t: performance.now() };
     cam.beginDrag();
     if (!touched) {
       touched = true;
-      hint.classList.remove("on");
+      hint.classList.remove(`${NS}-on`);
     }
   });
 
-  stage.addEventListener("pointermove", (e) => {
+  on(stage, "pointermove", (e) => {
     if (e.pointerId !== pointerId) return;
     const now = performance.now();
     const dt = Math.max(0.001, (now - last.t) / 1000);
@@ -1330,32 +1600,35 @@ async function main() {
     if (e.pointerId !== pointerId) return;
     stage.releasePointerCapture(pointerId);
     pointerId = null;
-    stage.classList.remove("dragging");
+    stage.classList.remove(`${NS}-dragging`);
     cam.endDrag();
   };
-  stage.addEventListener("pointerup", release);
-  stage.addEventListener("pointercancel", release);
-  stage.addEventListener("contextmenu", (e) => e.preventDefault());
+  on(stage, "pointerup", release);
+  on(stage, "pointercancel", release);
+  on(stage, "contextmenu", (e) => e.preventDefault());
 
-  // Trackpad / wheel: horizontal scroll walks the gallery too.
-  stage.addEventListener(
+  // Trackpad: a horizontal swipe walks the gallery. A vertical wheel is deliberately left
+  // alone and passed through — an embedded section must never capture the page's scroll.
+  on(
+    stage,
     "wheel",
     (e) => {
-      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-      cam.x = Camera.resist(cam.x + d * 0.0016, TRAVEL_X);
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+      cam.x = Camera.resist(cam.x + e.deltaX * 0.0016, TRAVEL_X);
       cam.vx = 0;
       cam.idle = 0;
       if (!touched) {
         touched = true;
-        hint.classList.remove("on");
+        hint.classList.remove(`${NS}-on`);
       }
       e.preventDefault();
     },
     { passive: false }
   );
 
-  // Keyboard, for desktop.
-  window.addEventListener("keydown", (e) => {
+  // Keyboard, for desktop. Bound to the element and not to the document, so arrow keys only
+  // move the camera while the gallery actually has focus.
+  on(root, "keydown", (e) => {
     const step = e.shiftKey ? 0.26 : 0.13;
     if (e.key === "ArrowLeft") cam.vx -= step * 6;
     else if (e.key === "ArrowRight") cam.vx += step * 6;
@@ -1462,20 +1735,69 @@ async function main() {
     gl.bindVertexArray(emptyVAO);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-    requestAnimationFrame(frame);
+    raf = requestAnimationFrame(frame);
   }
 
-  requestAnimationFrame(frame);
-  boot.classList.add("gone");
-  setTimeout(() => {
-    if (!touched) hint.classList.add("on");
+  // A gallery scrolled past should cost nothing: rendering stops entirely when it leaves the
+  // viewport and resumes, with a fresh clock, when it comes back.
+  let raf = 0;
+  let running = false;
+  const startLoop = () => {
+    if (running || isDisposed()) return;
+    running = true;
+    prev = performance.now();
+    raf = requestAnimationFrame(frame);
+  };
+  const stopLoop = () => {
+    running = false;
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+  };
+  disposers.push(stopLoop);
+
+  if (typeof IntersectionObserver === "function") {
+    const vis = new IntersectionObserver((es) => (es[0].isIntersecting ? startLoop() : stopLoop()));
+    vis.observe(root);
+    disposers.push(() => vis.disconnect());
+  }
+  startLoop();
+
+  bootEl.classList.add(`${NS}-gone`);
+  const t1 = setTimeout(() => {
+    if (!touched) hint.classList.add(`${NS}-on`);
   }, 1500);
-  setTimeout(() => hint.classList.remove("on"), 11000);
+  const t2 = setTimeout(() => hint.classList.remove(`${NS}-on`), 11000);
+  disposers.push(() => {
+    clearTimeout(t1);
+    clearTimeout(t2);
+  });
 }
 
-main().catch((err) => {
-  console.error(err);
-  document.getElementById("fail").style.display = "grid";
-  document.getElementById("fail").textContent = String(err.message || err);
-  boot.classList.add("gone");
-});
+/* ------------------------------------------------------------------ *
+ * 10. Drop-in
+ *
+ *   <div data-milaedia-gallery data-src="/assets/gallery.png"></div>
+ *   <script src="/assets/gallery.js"></script>
+ *
+ * Any element carrying data-milaedia-gallery is mounted automatically. A page that builds its
+ * own DOM can call MilaediaGallery.mount(element) and keep the returned handle instead.
+ * ------------------------------------------------------------------ */
+
+const MilaediaGallery = {
+  mount,
+  mountAll(scope = document) {
+    return Array.from(scope.querySelectorAll("[data-milaedia-gallery]"))
+      .filter((el) => !el.classList.contains(`${NS}-root`))
+      .map((el) => mount(el));
+  },
+};
+
+if (typeof window !== "undefined") {
+  window.MilaediaGallery = MilaediaGallery;
+  const auto = () => MilaediaGallery.mountAll();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", auto, { once: true });
+  } else {
+    auto();
+  }
+}
