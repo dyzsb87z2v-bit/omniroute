@@ -22,38 +22,82 @@
  *                 dark pillars, so no alcove is ever split by a seam.
  */
 
-const IMG_W = 768;
-const IMG_H = 1376;
-const ASPECT = IMG_W / IMG_H;
+/**
+ * The reconstruction of the portrait showroom render, solved from that image. Any other hall
+ * needs its own numbers — pass them as `options.geometry` and `options.alcoves` — which is what
+ * lets a shop swap the render without the engine being rebuilt around it.
+ */
+export const DEFAULT_GEOMETRY = {
+  width: 768,
+  height: 1376,
+  horizon: 0.4423, // from two identical left-wall alcoves at different depths
+  field: 1.4, // ~70 degrees vertical
+  eye: 1.55,
+  ceiling: 2.0,
+  wallX: 1.3, // corners at image x 0.335 / 0.665, inside the dark pillars
+  backZ: -10.1,
+  /* The nearest alcove is only ~3.4 m away and these alcoves hold real stock, so the travel is
+   * deliberately short: far enough to read as a room you walk through, not so far that a piece
+   * swings out of frame. */
+  travelX: 0.34,
+};
 
-const HORIZON = 0.4423;
-const FIELD = 1.4;
-const EYE = 1.55;
-const FLOOR_Y = -EYE;
-const CEIL_Y = 2.0;
-const WALL_X = 1.3;
-const BACK_Z = -10.1;
-const FRONT_Z = 1.0;
-const NEAR = 0.1;
-const FAR = 60.0;
-
-/* The nearest alcove is only ~3.4 m away and these alcoves hold real stock, so the travel is
- * deliberately short: far enough to read as a room you walk through, not so far that a piece
- * swings out of frame. */
-const TRAVEL_X = 0.34;
-const TRAVEL_Y = 0.08;
-const LOOK_BIAS = 0.18;
-const LOOK_PIVOT = 7.2;
-
-/* The site's own alcove rectangles, in its GalleryHall order:
+/* Alcove rectangles for that render, in the site's GalleryHall order:
  * far left, near left, centre, near right, far right. */
-export const ALCOVES = [
+export const DEFAULT_ALCOVES = [
   { rect: [0.148, 0.368, 0.198, 0.484], plane: "left" },
   { rect: [0.006, 0.336, 0.09, 0.502], plane: "left" },
   { rect: [0.384, 0.306, 0.576, 0.502], plane: "back" },
   { rect: [0.91, 0.336, 0.994, 0.502], plane: "right" },
   { rect: [0.802, 0.368, 0.852, 0.484], plane: "right" },
 ];
+
+/* Kept for callers that only want the default set. */
+export const ALCOVES = DEFAULT_ALCOVES;
+
+/* The live values. A page shows one hall at a time — portrait or landscape, never both — so
+ * these are set per mount; mountHall refuses a second, differently-configured hall rather than
+ * letting two quietly corrupt each other. */
+let IMG_W,
+  IMG_H,
+  ASPECT,
+  HORIZON,
+  FIELD,
+  FLOOR_Y,
+  CEIL_Y,
+  WALL_X,
+  BACK_Z,
+  TRAVEL_X,
+  ALCOVE_SET;
+let activeKey = null;
+
+const FRONT_Z = 1.0;
+const NEAR = 0.1;
+const FAR = 60.0;
+const TRAVEL_Y = 0.08;
+const LOOK_BIAS = 0.18;
+const LOOK_PIVOT = 7.2;
+
+function applyConfig(geometry, alcoves) {
+  const g = { ...DEFAULT_GEOMETRY, ...(geometry || {}) };
+  const set = Array.isArray(alcoves) && alcoves.length ? alcoves : DEFAULT_ALCOVES;
+  const key = JSON.stringify([g, set]);
+  if (activeKey && activeKey !== key) {
+    throw new Error("a differently configured hall is already mounted on this page");
+  }
+  activeKey = key;
+  IMG_W = g.width;
+  IMG_H = g.height;
+  ASPECT = g.width / g.height;
+  HORIZON = g.horizon;
+  FIELD = g.field;
+  FLOOR_Y = -g.eye;
+  CEIL_Y = g.ceiling;
+  WALL_X = g.wallX;
+  BACK_Z = g.backZ;
+  TRAVEL_X = g.travelX;
+  ALCOVE_SET = set;
+}
 
 /* ---------------------------------------------------------------- math ---- */
 
@@ -392,6 +436,7 @@ function loadImage(src) {
  * passes vertical scroll straight through to the page, and stops rendering off screen.
  */
 export function mountHall(root, options = {}) {
+  applyConfig(options.geometry, options.alcoves);
   const doc = root.ownerDocument;
   const stage = doc.createElement("div");
   // pan-y, not none: the hall can fill a whole screen, and a page that navigates by scrolling
@@ -404,7 +449,7 @@ export function mountHall(root, options = {}) {
   stage.appendChild(canvas);
   root.appendChild(stage);
 
-  const alcoves = ALCOVES.map((a) => {
+  const alcoves = ALCOVE_SET.map((a) => {
     const el = doc.createElement("div");
     el.style.cssText =
       "position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;backface-visibility:hidden";
@@ -488,7 +533,7 @@ async function start(root, stage, canvas, alcoveEls, options, on, off, isDispose
 
   const prog = buildProgram(gl);
   const surfaces = roomSurfaces(gl);
-  const alcoveGeom = ALCOVES.map((a, i) => ({
+  const alcoveGeom = ALCOVE_SET.map((a, i) => ({
     el: alcoveEls[i],
     corners: alcoveCorners(a),
     w: Math.max(1, Math.round((a.rect[2] - a.rect[0]) * IMG_W)),

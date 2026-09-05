@@ -55,6 +55,38 @@ Render whatever you like into those elements; the gallery only moves them.
 maths and shaders, no furnished-hall machinery, one draw pass, no post-processing — about a third
 of the size.
 
+### Pointing it at a different hall
+
+The measurements are defaults, not constants. `mountHall(root, options)` takes a `geometry` and
+an `alcoves` list, each merged over `DEFAULT_GEOMETRY` / `DEFAULT_ALCOVES`:
+
+```js
+mountHall(el, {
+  src: "/assets/hall.jpg",
+  geometry: { width: 1536, height: 2752, horizon: 0.4423, field: 1.4, eye: 1.55,
+              ceiling: 2.0, wallX: 1.3, backZ: -10.1, travelX: 0.34 },
+  alcoves: [{ rect: [0.148, 0.368, 0.198, 0.484], plane: "left" }, /* … */],
+});
+```
+
+`horizon` is the row where the vanishing point sits, as a fraction of image height; `field` is
+the horizontal half-extent of the frustum at the near plane; the rest are metres, reconstructed
+from the photograph. `rect` is `[x0, y0, x1, y1]` in image fractions and `plane` is which wall
+the rectangle lies on (`left`, `back`, `right`), which is what keeps a carpet pinned to the wall
+instead of sliding across it as the camera moves.
+
+Swapping the photograph for one shot from a different camera means re-solving `horizon` and
+`field` — the engine cannot infer them. To catch the mistake early it compares the loaded
+image's aspect ratio against `width / height` and refuses to mount on a mismatch greater than
+1 %, rather than rendering a subtly wrong room:
+
+```
+hall render is 900x1100 (aspect 0.8182); the reconstruction expects 0.5581
+```
+
+A second hall mounted with different numbers in the same document is also rejected: the geometry
+lives in module state, so two configurations cannot coexist.
+
 ---
 
 ## Embedding it in a site
