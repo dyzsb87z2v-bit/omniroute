@@ -394,8 +394,11 @@ function loadImage(src) {
 export function mountHall(root, options = {}) {
   const doc = root.ownerDocument;
   const stage = doc.createElement("div");
-  stage.style.cssText =
-    "position:absolute;left:0;top:0;margin:0;padding:0;touch-action:none;cursor:grab";
+  // pan-y, not none: the hall can fill a whole screen, and a page that navigates by scrolling
+  // would become unusable on a phone if the hall swallowed vertical touches. The browser keeps
+  // vertical panning; horizontal drags are left to us for the camera.
+  const touchAction = options.touchAction || "pan-y";
+  stage.style.cssText = `position:absolute;left:0;top:0;margin:0;padding:0;cursor:grab;touch-action:${touchAction}`;
   const canvas = doc.createElement("canvas");
   canvas.style.cssText = "display:block;width:100%;height:100%;max-width:none;max-height:none";
   stage.appendChild(canvas);
@@ -451,6 +454,17 @@ async function start(root, stage, canvas, alcoveEls, options, on, off, isDispose
   const photo = await loadImage(options.src);
   if (isDisposed()) return;
 
+  // The reconstruction was solved from one specific render. If a different one is ever put in
+  // its place, its proportions will not match and every alcove would land in the wrong spot, so
+  // bail and let the caller fall back to the flat hall rather than show carpets off their walls.
+  const shot = photo.naturalWidth / photo.naturalHeight;
+  if (Math.abs(shot - ASPECT) > 0.01) {
+    throw new Error(
+      `hall render is ${photo.naturalWidth}x${photo.naturalHeight} (aspect ${shot.toFixed(4)}); ` +
+        `the reconstruction expects ${ASPECT.toFixed(4)}`
+    );
+  }
+
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
@@ -481,29 +495,39 @@ async function start(root, stage, canvas, alcoveEls, options, on, off, isDispose
     h: Math.max(1, Math.round((a.rect[3] - a.rect[1]) * IMG_H)),
   }));
 
-  /* Composed 9:16, letterboxed inside whatever box the host gives it. */
-  const MAX_PIXELS = 2.6e6;
+  /* Letterboxed inside whatever box the host gives it, unless the host supplies its own
+   * framing. `options.layout(vw, vh, aspect)` returns { w, h, left, top } in CSS pixels, which
+   * lets a page that already zooms and crops its hall keep exactly that composition — the
+   * alcoves follow, because they are projected into this same box. */
+  const MAX_PIXELS = 3.5e6;
   let stageW = 0;
   let stageH = 0;
   function resize() {
     const vw = Math.max(2, root.clientWidth);
     const vh = Math.max(2, root.clientHeight);
-    let w = vw;
-    let h = Math.round(w / ASPECT);
-    if (h > vh) {
-      h = vh;
-      w = Math.round(h * ASPECT);
+
+    let box = typeof options.layout === "function" ? options.layout(vw, vh, ASPECT) : null;
+    if (!box || !(box.w > 0) || !(box.h > 0)) {
+      let w = vw;
+      let h = Math.round(w / ASPECT);
+      if (h > vh) {
+        h = vh;
+        w = Math.round(h * ASPECT);
+      }
+      box = { w, h, left: (vw - w) / 2, top: (vh - h) / 2 };
     }
-    stageW = w;
-    stageH = h;
-    stage.style.width = `${w}px`;
-    stage.style.height = `${h}px`;
+
+    stageW = Math.max(2, Math.round(box.w));
+    stageH = Math.max(2, Math.round(box.h));
+    stage.style.width = `${stageW}px`;
+    stage.style.height = `${stageH}px`;
     // whole-pixel placement: a fractional offset resamples the entire frame
-    stage.style.left = `${Math.round((vw - w) / 2)}px`;
-    stage.style.top = `${Math.round((vh - h) / 2)}px`;
+    stage.style.left = `${Math.round(box.left)}px`;
+    stage.style.top = `${Math.round(box.top)}px`;
+
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    let bw = Math.round(w * dpr);
-    let bh = Math.round(h * dpr);
+    const bw = Math.round(stageW * dpr);
+    const bh = Math.round(stageH * dpr);
     const fit = Math.min(1, Math.sqrt(MAX_PIXELS / (bw * bh)));
     canvas.width = Math.max(2, Math.round(bw * fit));
     canvas.height = Math.max(2, Math.round(bh * fit));
