@@ -37,6 +37,10 @@ NUMBER_DIGITS = 3          # 3 -> 001 / 4 -> 0001
 # Set this to True only if you want the generated demo carpets back.
 USE_PLACEHOLDER_IMAGERY = False
 
+# Empty frames carry nothing but their four corner register marks. Set this to
+# True to print a small "PHOTOGRAPH · MiLAEDiA 001" hint inside each empty frame.
+FRAME_CAPTIONS = False
+
 PHOTOS_DIR = os.path.join(HERE, "photos")   # drop 001.jpg, 002.jpg ... here
 PLATES_DIR = os.path.join(HERE, "plates")   # generated placeholder imagery
 FONTS_DIR = os.path.join(HERE, "fonts")
@@ -192,8 +196,9 @@ def photo_frame(c, x, y, w, h, caption, dark=False):
             c.line(cx0, cy0, cx0 + sx * t, cy0)
             c.line(cx0, cy0, cx0, cy0 + sy * t)
 
-    col = ON_DARK_D if dark else HexColor(0xA79E8D)
-    ls(c, x + w / 2.0, y + h / 2.0 - 2.5, caption, "Jost-L", 6.4, col, 3.0, align="c")
+    if FRAME_CAPTIONS and caption:
+        col = ON_DARK_D if dark else HexColor(0xA79E8D)
+        ls(c, x + w / 2.0, y + h / 2.0 - 2.5, caption, "Jost-L", 6.4, col, 3.0, align="c")
 
 def ensure_imagery(numbers):
     """

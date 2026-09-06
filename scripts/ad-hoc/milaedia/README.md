@@ -90,8 +90,12 @@ open the PDF in Acrobat Pro, Canva, Affinity Publisher or Word, place your photo
 frame, and export. The register marks in each corner show the exact area a photo should cover.
 The form fields keep working — but re-save as PDF, not as images, or the fields are lost.
 
-> `USE_PLACEHOLDER_IMAGERY = True` in the CONFIG block brings back generated demo carpets
-> instead of empty frames. Useful for showing the layout, never for a real seller.
+Two switches in the CONFIG block control the empty state:
+
+```python
+USE_PLACEHOLDER_IMAGERY = False   # True -> generated demo carpets instead of empty frames
+FRAME_CAPTIONS          = False   # True -> a small "PHOTOGRAPH · MiLAEDiA 001" hint in each frame
+```
 
 ### Changing the product numbers or the number of plates
 
