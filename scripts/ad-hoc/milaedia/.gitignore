@@ -1,0 +1,4 @@
+plates/
+photos/*
+!photos/.gitkeep
+.build.pdf
