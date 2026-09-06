@@ -32,6 +32,11 @@ NUMBER_PREFIX = "MiLAEDiA" # printed before every product number
 START_NUMBER = 1           # first product number  ->  MiLAEDiA 001
 NUMBER_DIGITS = 3          # 3 -> 001 / 4 -> 0001
 
+# Photo frames are left EMPTY by default. Drop your own carpet photographs into
+# ./photos/ (001.jpg, 002.jpg, cover.jpg ...) and rebuild — each one fills its frame.
+# Set this to True only if you want the generated demo carpets back.
+USE_PLACEHOLDER_IMAGERY = False
+
 PHOTOS_DIR = os.path.join(HERE, "photos")   # drop 001.jpg, 002.jpg ... here
 PLATES_DIR = os.path.join(HERE, "plates")   # generated placeholder imagery
 FONTS_DIR = os.path.join(HERE, "fonts")
@@ -162,6 +167,34 @@ def labelled_field(c, name, x, y, w, text, h=FIELD_H, size=10.5,
 # imagery
 # --------------------------------------------------------------------------
 
+FRAME_BG      = HexColor(0xEFE9DC)
+FRAME_BG_DARK = HexColor(0x22201C)
+FRAME_LINE    = HexColor(0xD3C9B4)
+FRAME_LINE_DK = HexColor(0x3E3A32)
+
+
+def photo_frame(c, x, y, w, h, caption, dark=False):
+    """
+    An empty, waiting photograph: soft panel, hairline edge, four register
+    marks. Replaced in full the moment a file appears in ./photos/.
+    """
+    c.setFillColor(FRAME_BG_DARK if dark else FRAME_BG)
+    c.rect(x, y, w, h, stroke=0, fill=1)
+    c.setStrokeColor(FRAME_LINE_DK if dark else FRAME_LINE)
+    c.setLineWidth(0.5)
+    c.rect(x, y, w, h, stroke=1, fill=0)
+
+    o, t = 13.0, 15.0                      # inset, tick length
+    c.setStrokeColor(CHAMPAGNE if dark else GOLD)
+    c.setLineWidth(0.7)
+    for sx, cx0 in ((1, x + o), (-1, x + w - o)):
+        for sy, cy0 in ((1, y + o), (-1, y + h - o)):
+            c.line(cx0, cy0, cx0 + sx * t, cy0)
+            c.line(cx0, cy0, cx0, cy0 + sy * t)
+
+    col = ON_DARK_D if dark else HexColor(0xA79E8D)
+    ls(c, x + w / 2.0, y + h / 2.0 - 2.5, caption, "Jost-L", 6.4, col, 3.0, align="c")
+
 def ensure_imagery(numbers):
     """
     Returns {key: jpeg path}. A real photograph in ./photos/ always wins:
@@ -169,18 +202,41 @@ def ensure_imagery(numbers):
         photos/cover.jpg ->  cover image
     Anything missing is generated procedurally.
     """
-    import carpet_render as cr
     from PIL import Image
+
+    cr = None
+    if USE_PLACEHOLDER_IMAGERY:
+        import carpet_render as cr  # noqa: F401
 
     os.makedirs(PLATES_DIR, exist_ok=True)
     os.makedirs(PHOTOS_DIR, exist_ok=True)
     out = {}
 
+    EXTS = (".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".bmp", ".heic")
+
     def supplied(stem):
-        for ext in (".jpg", ".jpeg", ".JPG", ".JPEG", ".png", ".PNG", ".webp"):
-            p = os.path.join(PHOTOS_DIR, stem + ext)
-            if os.path.exists(p):
-                return p
+        """
+        Forgiving filename matching, so photographs can be dropped in straight
+        from a phone or a camera card. For plate 007 all of these work:
+            007.jpg   7.jpg   007-tabriz.jpeg   7 Kashan silk.png
+        """
+        try:
+            files = sorted(os.listdir(PHOTOS_DIR))
+        except FileNotFoundError:
+            return None
+        keys = {stem.lower()}
+        if stem.isdigit():
+            keys.add(str(int(stem)))
+        for fn in files:
+            base, ext = os.path.splitext(fn)
+            if ext.lower() not in EXTS:
+                continue
+            b = base.strip().lower()
+            if b in keys:
+                return os.path.join(PHOTOS_DIR, fn)
+            for k in keys:
+                if b.startswith(k) and not b[len(k):len(k) + 1].isdigit():
+                    return os.path.join(PHOTOS_DIR, fn)
         return None
 
     def fit(src, w, h, dst):
@@ -211,26 +267,32 @@ def ensure_imagery(numbers):
     src = supplied("cover")
     if src:
         fit(src, cov_w, cov_h, dst)
-    else:
+        out["cover"] = dst
+    elif cr:
         im = cr.detail(cr.SCHEMES[1], cov_w, cov_h, seed=101, knot_px=11,
                        crop=("center", 0.70))
         fade(im, 0.34).save(dst, "JPEG", quality=90, optimize=True)
-    out["cover"] = dst
+        out["cover"] = dst
+    else:
+        out["cover"] = None
 
     # ---- editorial bands ---------------------------------------------------
     for key, (bw, bh, sch, seed, crp) in {
-        "band_intro":  (CW, 224, cr.SCHEMES[6], 202, ("center", 0.34)),
-        "band_supp":   (CW, 196, cr.SCHEMES[3], 203, ("top", 0.30)),
-        "band_final":  (CW, 150, cr.SCHEMES[8], 204, ("bottom", 0.24)),
+        "band_intro":  (CW, 224, 6, 202, ("center", 0.34)),
+        "band_supp":   (CW, 196, 3, 203, ("top", 0.30)),
+        "band_final":  (CW, 150, 8, 204, ("bottom", 0.24)),
     }.items():
         dst = os.path.join(PLATES_DIR, key + ".jpg")
         src = supplied(key)
         if src:
             fit(src, int(bw * S), int(bh * S), dst)
-        else:
-            cr.detail(sch, int(bw * S), int(bh * S), seed=seed, knot_px=11,
+            out[key] = dst
+        elif cr:
+            cr.detail(cr.SCHEMES[sch], int(bw * S), int(bh * S), seed=seed, knot_px=11,
                       crop=crp).save(dst, "JPEG", quality=88, optimize=True)
-        out[key] = dst
+            out[key] = dst
+        else:
+            out[key] = None
 
     # ---- carpet plates -----------------------------------------------------
     pw_, ph_ = int(CW * S), int(PLATE_H * S)
@@ -239,13 +301,16 @@ def ensure_imagery(numbers):
         src = supplied(num)
         if src:
             fit(src, pw_, ph_, dst)
-        else:
+            out[num] = dst
+        elif cr:
             sch = cr.SCHEMES[i % len(cr.SCHEMES)]
             cr.plate(sch, pw_, ph_, seed=i * 7 + 3,
                      geometric=(sch["name"] in ("heriz", "serapi")),
                      fill=0.88 + 0.03 * ((i % 3) - 1)).save(
                 dst, "JPEG", quality=88, optimize=True)
-        out[num] = dst
+            out[num] = dst
+        else:
+            out[num] = None
     return out
 
 
@@ -282,7 +347,13 @@ def running_head(c, right_text=None, dark=False):
 def page_cover(c, img):
     c.setFillColor(CHARCOAL)
     c.rect(0, 0, PW, PH, stroke=0, fill=1)
-    c.drawImage(img, 0, PH - COVER_IMG_H, PW, COVER_IMG_H)
+    if img:
+        c.drawImage(img, 0, PH - COVER_IMG_H, PW, COVER_IMG_H)
+    else:
+        c.setFillColor(CHAR_SOFT)
+        c.rect(0, PH - COVER_IMG_H, PW, COVER_IMG_H, stroke=0, fill=1)
+        photo_frame(c, M, PH - COVER_IMG_H + 44, CW, COVER_IMG_H - 88,
+                    "COVER PHOTOGRAPH", dark=True)
 
     cx = PW / 2.0
     ls(c, cx, 214, BRAND, "Corm-L", 47, ON_DARK, 11.5, align="c")
@@ -335,7 +406,10 @@ def page_intro(c, band):
         ls(c, M + 30, yy - 12.4, l2, "Jost-L", 8.0, GREY_DK, 0.12)
         yy -= 36
 
-    c.drawImage(band, M, 68, CW, 224)
+    if band:
+        c.drawImage(band, M, 68, CW, 224)
+    else:
+        photo_frame(c, M, 68, CW, 224, "EDITORIAL PHOTOGRAPH")
     rule(c, M, 56, PW - M, RULE, 0.4)
     ls(c, M, 44, LINE_3, "Jost-L", 6.2, GREY, 3.0)
     ls(c, PW - M, 44, "MASTER CATALOGUE", "Jost-L", 6.2, GREY, 3.0, align="r")
@@ -368,7 +442,10 @@ def page_supplier(c, band):
     field(c, "supplier_address", M, 316, CW, 62, size=10.5, multiline=True,
           tooltip="Address / Gallery")
 
-    c.drawImage(band, M, 92, CW, 196)
+    if band:
+        c.drawImage(band, M, 92, CW, 196)
+    else:
+        photo_frame(c, M, 92, CW, 196, "EDITORIAL PHOTOGRAPH")
     rule(c, M, 76, PW - M, RULE, 0.4)
     ls(c, M, 60, BRAND + " · " + LINE_3, "Jost-L", 6.2, GREY, 2.6)
     ls(c, PW - M, 60, "SECTION I · SUPPLIER", "Jost-L", 6.2, GREY, 2.6, align="r")
@@ -384,10 +461,14 @@ def page_carpet(c, number, index, total, img):
     rule(c, M, 724, M + 34, GOLD, 0.9)
     ls(c, PW - M, 738, "SINGLE PIECE RECORD", "Jost-L", 6.2, GREY, 2.4, align="r")
 
-    c.drawImage(img, M, PLATE_BOT, CW, PLATE_H)
-    c.setStrokeColor(HexColor(0xCFC5B0))
-    c.setLineWidth(0.5)
-    c.rect(M, PLATE_BOT, CW, PLATE_H, stroke=1, fill=0)
+    if img:
+        c.drawImage(img, M, PLATE_BOT, CW, PLATE_H)
+        c.setStrokeColor(HexColor(0xCFC5B0))
+        c.setLineWidth(0.5)
+        c.rect(M, PLATE_BOT, CW, PLATE_H, stroke=1, fill=0)
+    else:
+        photo_frame(c, M, PLATE_BOT, CW, PLATE_H,
+                    "PHOTOGRAPH  ·  %s %s" % (NUMBER_PREFIX, number))
 
     p = "c%s_" % number
     # row A — two columns
@@ -449,7 +530,10 @@ def page_final(c, band):
     labelled_field(c, "final_additional_information", M, 282, CW,
                    "ADDITIONAL INFORMATION", h=52, size=10.5, multiline=True)
 
-    c.drawImage(band, M, 104, CW, 150)
+    if band:
+        c.drawImage(band, M, 104, CW, 150)
+    else:
+        photo_frame(c, M, 104, CW, 150, "EDITORIAL PHOTOGRAPH")
     rule(c, M, 88, PW - M, RULE, 0.4)
     ls(c, cx, 66, "Rare Persian carpets — curated for the European market",
        "Corm-LI", 10.5, GREY, 0.9, align="c")

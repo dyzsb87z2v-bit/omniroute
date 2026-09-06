@@ -5,6 +5,9 @@ Master template for the fillable collection catalogue.
 **Output:** `MiLAEDiA_Private_Persian_Carpet_Collection.pdf` — A4, 14 pages, 153 interactive
 form fields, openable and editable on phone, tablet and computer.
 
+**The photo frames ship empty.** Every carpet frame, the cover and the three editorial bands
+are left blank, waiting for your own photographs — see §3.
+
 ```
 Cover  ·  The Collection  ·  Supplier Information  ·  MiLAEDiA 001 … 010  ·  Supplier Notes
 ```
@@ -13,7 +16,7 @@ Cover  ·  The Collection  ·  Supplier Information  ·  MiLAEDiA 001 … 010  �
 
 ## 1 · Sending the catalogue to a seller
 
-Nothing to prepare — send the PDF as it is. The seller opens it in Adobe Acrobat Reader
+Put your carpet photographs in first (§3), then send the PDF as it is. The seller opens it in Adobe Acrobat Reader
 (free, iOS / Android / desktop), Apple Books, Preview, Google Drive PDF viewer, Edge or
 Chrome, types straight into the shaded fields, saves, and returns the file.
 
@@ -49,19 +52,30 @@ pip install reportlab pypdf pillow numpy
 python3 build_catalog.py
 ```
 
-### Replacing the carpet photographs
+### Adding your carpet photographs
 
-Drop image files into `photos/` — the filename is the product number:
+Drop your image files into `photos/` and run `python3 build_catalog.py` again. The filename
+decides which frame the photo lands in:
 
 ```
 photos/001.jpg      → plate MiLAEDiA 001
 photos/002.jpg      → plate MiLAEDiA 002
-photos/cover.jpg    → cover image
+photos/cover.jpg    → the cover
 photos/band_intro.jpg, band_supp.jpg, band_final.jpg   → the three editorial bands
 ```
 
-`.jpg`, `.jpeg`, `.png` and `.webp` are accepted. Each image is centre-cropped to its frame,
-so **shoot or crop roughly to the frame's proportion**:
+Naming is forgiving, so you can copy files straight off a phone or a camera card. For plate
+007 all of these are recognised:
+
+```
+007.jpg      7.jpg      007-tabriz.jpeg      7 Kashan silk.png
+```
+
+`.jpg .jpeg .png .webp .tif .bmp .heic` are accepted. Frames you have no photo for simply
+stay empty, so you can add carpets a few at a time and rebuild whenever you like.
+
+Each image is centre-cropped to fill its frame, so **shoot or crop roughly to the frame's
+proportion**:
 
 | Frame        | Proportion    | Recommended pixels |
 | ------------ | ------------- | ------------------ |
@@ -69,8 +83,15 @@ so **shoot or crop roughly to the frame's proportion**:
 | cover        | 1.12 : 1 wide | ≥ 1430 × 1280      |
 | bands        | 2.2–3.4 : 1   | ≥ 1210 × 540       |
 
-Any number without a photograph falls back to a generated placeholder plate, so a partially
-photographed collection still produces a complete catalogue.
+#### Without running anything
+
+If you would rather not run the script, the empty frames are also there to be filled by hand:
+open the PDF in Acrobat Pro, Canva, Affinity Publisher or Word, place your photograph over a
+frame, and export. The register marks in each corner show the exact area a photo should cover.
+The form fields keep working — but re-save as PDF, not as images, or the fields are lost.
+
+> `USE_PLACEHOLDER_IMAGERY = True` in the CONFIG block brings back generated demo carpets
+> instead of empty frames. Useful for showing the layout, never for a real seller.
 
 ### Changing the product numbers or the number of plates
 
@@ -95,9 +116,9 @@ A second seller therefore only needs: a new `photos/` folder, a new `START_NUMBE
 | File                | Purpose                                                          |
 | ------------------- | ---------------------------------------------------------------- |
 | `build_catalog.py`  | Page layout, typography and the interactive form. CONFIG on top.  |
-| `carpet_render.py`  | Generates the placeholder carpet imagery. Not needed once real photographs are in `photos/`. |
+| `carpet_render.py`  | Optional demo imagery (`USE_PLACEHOLDER_IMAGERY`). Not used in a normal build. |
 | `fonts/`            | Cormorant Garamond and Jost (SIL Open Font License 1.1).          |
-| `photos/`           | Your photographs. Empty by default.                              |
+| `photos/`           | **Your photographs go here.** Empty by default.                  |
 | `plates/`           | Build cache — safe to delete, regenerated on every build.        |
 
 ## 5 · Fields on each carpet plate
