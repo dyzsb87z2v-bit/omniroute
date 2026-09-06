@@ -27,7 +27,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 OUTPUT = "MiLAEDiA_Private_Persian_Carpet_Collection.pdf"
 
-CARPET_COUNT = 10          # number of carpet plates in the catalogue
+CARPET_COUNT = 15          # number of carpet plates in the catalogue
 NUMBER_PREFIX = "MiLAEDiA" # printed before every product number
 START_NUMBER = 1           # first product number  ->  MiLAEDiA 001
 NUMBER_DIGITS = 3          # 3 -> 001 / 4 -> 0001

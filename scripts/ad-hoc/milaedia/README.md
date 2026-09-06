@@ -2,14 +2,14 @@
 
 Master template for the fillable collection catalogue.
 
-**Output:** `MiLAEDiA_Private_Persian_Carpet_Collection.pdf` — A4, 14 pages, 153 interactive
+**Output:** `MiLAEDiA_Private_Persian_Carpet_Collection.pdf` — A4, 19 pages, 223 interactive
 form fields, openable and editable on phone, tablet and computer.
 
 **The photo frames ship empty.** Every carpet frame, the cover and the three editorial bands
 are left blank, waiting for your own photographs — see §3.
 
 ```
-Cover  ·  The Collection  ·  Supplier Information  ·  MiLAEDiA 001 … 010  ·  Supplier Notes
+Cover  ·  The Collection  ·  Supplier Information  ·  MiLAEDiA 001 … 015  ·  Supplier Notes
 ```
 
 ---
@@ -102,7 +102,7 @@ FRAME_CAPTIONS          = False   # True -> a small "PHOTOGRAPH · MiLAEDiA 001"
 Edit the CONFIG block at the top of `build_catalog.py`:
 
 ```python
-CARPET_COUNT  = 10          # how many carpet pages
+CARPET_COUNT  = 15          # how many carpet pages
 NUMBER_PREFIX = "MiLAEDiA"  # printed before every number
 START_NUMBER  = 1           # 1 -> MiLAEDiA 001 ; 41 -> MiLAEDiA 041
 NUMBER_DIGITS = 3           # 3 -> 001 ; 4 -> 0001
